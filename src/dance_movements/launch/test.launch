@@ -1,4 +1,3 @@
 <launch>
- <node name="movement_loop" pkg="dance_movements" type="position_loop.py" output="screen"/>
  <node name="test_movements" pkg="dance_movements" type="movements.py" output="screen"/>
 </launch>

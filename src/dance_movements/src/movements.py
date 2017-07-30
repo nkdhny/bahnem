@@ -1,70 +1,59 @@
-#! /home/nkdhny/Documents/bahnem/devel/env.sh python
+#! /usr/bin/env python
 
 import rospy
 from mavros_msgs.srv import CommandBool, CommandTOL, SetMode
-from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion
+from geometry_msgs.msg import PoseStamped, Pose, Point, Quaternion, \
+                                TwistStamped, Twist, Vector3
 from std_msgs.msg import Header
 import tf
+import math
+from marker_navigator.srv import SetPosition, \
+    SetPositionYawRate, \
+    SetVelocity, \
+    SetVelocityYawRate, \
+    SetAttitude, \
+    SetAttitudeYawRate, \
+    SetRatesYaw, \
+    SetRates
 
-class Copter(object):
+set_position = rospy.ServiceProxy('/set_position', SetPosition)
+set_position_yaw_rate = rospy.ServiceProxy('/set_position/yaw_rate', SetPositionYawRate)
 
-    ARMING_SERVICE = "/mavros/cmd/arming"
-    TAKOFF_SERVICE = "/mavros/cmd/takeoff"
-    SET_POINT_LOCAL_POSITION = "/bahnem/setpoint_position/local"
+set_velocity = rospy.ServiceProxy('/set_velocity', SetVelocity)
+set_velocity_yaw_rate = rospy.ServiceProxy('/set_velocity/yaw_rate', SetVelocityYawRate)
 
-    def _wait_services(self):
-        rospy.wait_for_service(Copter.ARMING_SERVICE)
-        rospy.wait_for_service(Copter.TAKOFF_SERVICE)
+set_attitude = rospy.ServiceProxy('/set_attitude', SetAttitude)
+set_attitude_yaw_rate = rospy.ServiceProxy('/set_attitude/yaw_rate', SetAttitudeYawRate)
 
-    def __init__(self):
-        self._is_armed = False
+set_rates_yaw = rospy.ServiceProxy('/set_rates/yaw', SetRatesYaw)
+set_rates = rospy.ServiceProxy('/set_rates', SetRates)
 
-        self._wait_services()
-        self._arming_service = rospy.ServiceProxy(Copter.ARMING_SERVICE, CommandBool)
-        self._takoff_service = rospy.ServiceProxy(Copter.TAKOFF_SERVICE, CommandTOL)        
-        self._set_position_local = rospy.Publisher(
-            Copter.SET_POINT_LOCAL_POSITION, PoseStamped, queue_size=10)
-
-        self._set_mode = rospy.ServiceProxy('/mavros/set_mode', SetMode)
-
-        self.arm()
-
-    def arm(self):
-        assert not self._is_armed
-        assert self._set_mode(custom_mode="OFFBOARD").success
-        self._is_armed = self._arming_service(True).success
-
-        if self._is_armed:
-            rospy.loginfo("Copter armed")
-        else:
-            rospy.logwarn("Copter arming failed")
-
-
-    def disarm(self):
-        assert self._is_armed
-        if self._arming_service(False).success:
-            self._is_armed = False
-            rospy.loginfo("Copter disarmed")
-        else:
-            rospy.logwarn("Copter disarming failed")
+#release = rospy.ServiceProxy('/release', Trigger)
+set_mode = rospy.ServiceProxy('/mavros/set_mode', SetMode)
         
+def land():
+    assert set_mode(custom_mode="AUTO.LAND").success
+        
+def takeoff(altitude=2.5):
+    set_position(z=altitude, frame_id='local_origin')
 
-def takeoff(copter, altitude=2.5):
-    assert copter._is_armed
-    target_local_pose = PoseStamped(
-        pose=Pose(
-            position=Point(z=altitude), 
-            orientation=Quaternion(*tf.transformations.quaternion_from_euler(0, 0, 0))
-        ), header=Header(stamp=rospy.get_rostime(), frame_id='local_origin')
-    )
-    copter._set_position_local.publish(target_local_pose)
-    
+def twist(rate=0.1):
+    rospy.loginfo("Twist vs rate {}".format(rate))
+    set_velocity_yaw_rate(yaw_rate=rate, frame_id='local_origin')
+
+def ring(rad=1, angular=1):
+    set_velocity_yaw_rate(
+        vx=rad*angular, vy=0.0, vz=0, yaw_rate=angular, 
+        frame_id='fcu_horiz', update_frame=True)
+
 if __name__ == '__main__':
     rospy.init_node('test_movements')
-    rospy.sleep(2)
-    copter = Copter()
     rospy.sleep(1)
-    takeoff(copter)
+    takeoff()
+    rospy.sleep(5)
+    tilt(rate=1)
+    #land()
+    #rospy.sleep(1)
     rospy.spin()
 
     

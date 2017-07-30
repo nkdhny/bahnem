@@ -1,7 +1,7 @@
 import RPi.GPIO as GPIO
 import time
 
-LED = 18
+LED = 4
 
 GPIO.setmode(GPIO.BOARD)
 GPIO.setup(LED, GPIO.OUT)
